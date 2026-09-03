@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Autocomplete } from '@base-ui/react/autocomplete';
 import {
   Download,
   Heart,
@@ -78,7 +79,12 @@ const leftMainFields: Array<{
     placeholder: '例：関東',
     maxLength: 24,
   },
-  { key: 'oshi', label: '推し', placeholder: '例：野中美希さん', maxLength: 28 },
+  {
+    key: 'oshi',
+    label: '推し',
+    placeholder: '例：野中美希さん',
+    maxLength: 28,
+  },
   {
     key: 'oshiGroup',
     label: '推しグループ',
@@ -147,9 +153,9 @@ const isProfileState = (value: unknown): value is ProfileState => {
   const candidate = value as Partial<ProfileState>;
   return Boolean(
     candidate.values &&
-      Array.isArray(candidate.activityTypes) &&
-      candidate.globalStyle &&
-      candidate.fieldStyles,
+    Array.isArray(candidate.activityTypes) &&
+    candidate.globalStyle &&
+    candidate.fieldStyles,
   );
 };
 
@@ -186,6 +192,62 @@ function AppInput({
   );
 }
 
+function MemberInput({
+  fieldKey,
+  label,
+  value,
+  onValueChange,
+  onFocus,
+}: {
+  fieldKey: TextFieldKey;
+  label: string;
+  value: string;
+  onValueChange: (key: TextFieldKey, value: string) => void;
+  onFocus: (key: TextFieldKey) => void;
+}) {
+  return (
+    <Field>
+      <FieldLabel htmlFor={fieldKey}>{label}</FieldLabel>
+      <Autocomplete.Root
+        items={CURRENT_MEMBERS}
+        value={value}
+        onValueChange={(nextValue) => onValueChange(fieldKey, nextValue)}
+        openOnInputClick
+        autoHighlight
+      >
+        <Autocomplete.Input
+          id={fieldKey}
+          maxLength={24}
+          placeholder="選択または自由入力"
+          className="app-input"
+          onFocus={() => onFocus(fieldKey)}
+        />
+        <Autocomplete.Portal>
+          <Autocomplete.Positioner
+            className="member-suggestions-positioner"
+            sideOffset={5}
+            align="start"
+          >
+            <Autocomplete.Popup className="member-suggestions">
+              <Autocomplete.List>
+                {(member: string) => (
+                  <Autocomplete.Item
+                    key={member}
+                    value={member}
+                    className="member-suggestion"
+                  >
+                    {member}
+                  </Autocomplete.Item>
+                )}
+              </Autocomplete.List>
+            </Autocomplete.Popup>
+          </Autocomplete.Positioner>
+        </Autocomplete.Portal>
+      </Autocomplete.Root>
+    </Field>
+  );
+}
+
 function CountHint({
   value,
   recommended,
@@ -198,7 +260,8 @@ function CountHint({
   const over = value.length > recommended;
   return (
     <span className={over ? 'count-hint count-hint-over' : 'count-hint'}>
-      {value.length}文字／おすすめ{recommended}文字程度{lines ? `・${lines}行まで` : ''}
+      {value.length}文字／おすすめ{recommended}文字程度
+      {lines ? `・${lines}行まで` : ''}
     </span>
   );
 }
@@ -212,6 +275,7 @@ export default function Home() {
   const [selectedField, setSelectedField] = useState<TextFieldKey>('name');
   const [status, setStatus] = useState('');
   const [siteShareStatus, setSiteShareStatus] = useState('');
+  const [useXWebFallback, setUseXWebFallback] = useState(false);
   const canvasRef = useRef<ProfileCanvasHandle>(null);
 
   useEffect(() => {
@@ -226,7 +290,10 @@ export default function Home() {
               globalStyle: {
                 ...parsed.globalStyle,
                 // 初期版の既定値だけ、新しい推奨サイズへ引き上げます。
-                fontSize: parsed.globalStyle.fontSize === 20 ? 22 : parsed.globalStyle.fontSize,
+                fontSize:
+                  parsed.globalStyle.fontSize === 20
+                    ? 22
+                    : parsed.globalStyle.fontSize,
               },
             });
           }
@@ -299,7 +366,9 @@ export default function Home() {
 
               if (payload.values !== undefined) {
                 if (!payload.values || typeof payload.values !== 'object') {
-                  throw new Error('valuesは文字項目のオブジェクトで指定してください。');
+                  throw new Error(
+                    'valuesは文字項目のオブジェクトで指定してください。',
+                  );
                 }
                 for (const [key, value] of Object.entries(payload.values)) {
                   if (!fieldKeys.has(key) || typeof value !== 'string') {
@@ -315,16 +384,21 @@ export default function Home() {
                   !Array.isArray(payload.activityTypes) ||
                   payload.activityTypes.length !== 9 ||
                   payload.activityTypes.some(
-                    (value) => !Number.isInteger(value) || value < 0 || value > 10,
+                    (value) =>
+                      !Number.isInteger(value) || value < 0 || value > 10,
                   )
                 ) {
-                  throw new Error('activityTypesは0〜10の整数を9個指定してください。');
+                  throw new Error(
+                    'activityTypesは0〜10の整数を9個指定してください。',
+                  );
                 }
                 activityTypes = payload.activityTypes as number[];
               }
 
               if (!Object.keys(updates).length && !activityTypes) {
-                throw new Error('valuesまたはactivityTypesを指定してください。');
+                throw new Error(
+                  'valuesまたはactivityTypesを指定してください。',
+                );
               }
 
               setProfile((current) => ({
@@ -357,7 +431,10 @@ export default function Home() {
     }));
   };
 
-  const updateActivityType = (index: number, next: number | readonly number[]) => {
+  const updateActivityType = (
+    index: number,
+    next: number | readonly number[],
+  ) => {
     const value = Array.isArray(next) ? next[0] : next;
     setProfile((current) => {
       const activityTypes = [...current.activityTypes];
@@ -374,14 +451,20 @@ export default function Home() {
     [profile, selectedField],
   );
 
-  const updateGlobalStyle = (key: 'color' | 'fontSize', value: string | number) => {
+  const updateGlobalStyle = (
+    key: 'color' | 'fontSize',
+    value: string | number,
+  ) => {
     setProfile((current) => ({
       ...current,
       globalStyle: { ...current.globalStyle, [key]: value },
     }));
   };
 
-  const updateFieldStyle = (key: 'color' | 'fontSize', value: string | number) => {
+  const updateFieldStyle = (
+    key: 'color' | 'fontSize',
+    value: string | number,
+  ) => {
     setProfile((current) => ({
       ...current,
       fieldStyles: {
@@ -435,33 +518,70 @@ export default function Home() {
     }
   };
 
-  const shareToX = async () => {
+  const makeShareText = () => {
+    const shareUrl = new URL(window.location.href);
+    shareUrl.search = '';
+    shareUrl.hash = '';
+    return `${shareUrl.toString()}\n#MMプロフィール #さんくすちぇるしー`;
+  };
+
+  const shareViaXWeb = async (shareText: string) => {
+    const xWindow = window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`,
+      '_blank',
+    );
+    if (xWindow) xWindow.opener = null;
+
     try {
       const blob = await canvasRef.current?.makeBlob(previewView);
       if (!blob) return;
-      const file = new File([blob], fileNames[previewView], { type: 'image/png' });
-      const shareUrl = new URL(window.location.href);
-      shareUrl.search = '';
-      shareUrl.hash = '';
-      const shareText = `${shareUrl.toString()}\n#MMプロフィール #さんくすちぇるしー`;
+      saveBlob(blob, fileNames[previewView]);
+      setStatus(
+        xWindow
+          ? '画像を保存し、Xの投稿画面を開きました。画像を添付してください。'
+          : '画像を保存しました。Xを開けない場合は、ブラウザのポップアップ設定をご確認ください。',
+      );
+    } catch {
+      setStatus('画像を保存できませんでした。もう一度お試しください。');
+    }
+  };
+
+  const shareToX = async () => {
+    const shareText = makeShareText();
+    const probeFile = new File([''], fileNames[previewView], {
+      type: 'image/png',
+    });
+    const shareNavigator = navigator as unknown as {
+      share?: (data: ShareData) => Promise<void>;
+      canShare?: (data: ShareData) => boolean;
+    };
+    const canShareFiles = Boolean(
+      !useXWebFallback &&
+      shareNavigator.share &&
+      shareNavigator.canShare?.({ files: [probeFile] }),
+    );
+
+    if (!canShareFiles) {
+      await shareViaXWeb(shareText);
+      return;
+    }
+
+    try {
+      const blob = await canvasRef.current?.makeBlob(previewView);
+      if (!blob) return;
+      const file = new File([blob], fileNames[previewView], {
+        type: 'image/png',
+      });
       const shareData = { files: [file], text: shareText };
 
-      if (navigator.share && navigator.canShare?.(shareData)) {
-        await navigator.share(shareData);
-        setStatus('共有画面を開きました。');
-        return;
-      }
-
-      saveBlob(blob, fileNames[previewView]);
-      window.open(
-        `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`,
-        '_blank',
-        'noopener,noreferrer',
-      );
-      setStatus('画像を保存し、Xの投稿画面を開きました。画像を添付してください。');
+      await shareNavigator.share?.(shareData);
+      setStatus('共有画面を開きました。');
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      setStatus('共有画面を開けませんでした。画像保存をお試しください。');
+      setUseXWebFallback(true);
+      setStatus(
+        'この端末向けの共有方法に切り替えました。もう一度ボタンを押してください。',
+      );
     }
   };
 
@@ -497,7 +617,8 @@ export default function Home() {
     <Card className="settings-card">
       <CardHeader>
         <CardTitle className="section-title">
-          <Palette aria-hidden="true" />文字の見た目
+          <Palette aria-hidden="true" />
+          文字の見た目
         </CardTitle>
       </CardHeader>
       <CardContent className="settings-grid">
@@ -509,12 +630,15 @@ export default function Home() {
               type="color"
               value={profile.globalStyle.color}
               aria-label="すべての文字色"
-              onChange={(event) => updateGlobalStyle('color', event.target.value)}
+              onChange={(event) =>
+                updateGlobalStyle('color', event.target.value)
+              }
             />
             <code>{profile.globalStyle.color.toUpperCase()}</code>
           </label>
           <label className="size-row">
-            <span>文字サイズ</span><strong>{profile.globalStyle.fontSize}px</strong>
+            <span>文字サイズ</span>
+            <strong>{profile.globalStyle.fontSize}px</strong>
           </label>
           <Slider
             min={14}
@@ -523,7 +647,10 @@ export default function Home() {
             value={[profile.globalStyle.fontSize]}
             aria-label="すべての文字サイズ"
             onValueChange={(value) =>
-              updateGlobalStyle('fontSize', Array.isArray(value) ? value[0] : value)
+              updateGlobalStyle(
+                'fontSize',
+                Array.isArray(value) ? value[0] : value,
+              )
             }
           />
         </div>
@@ -534,14 +661,19 @@ export default function Home() {
             value={selectedField}
             onValueChange={(value) => setSelectedField(value as TextFieldKey)}
           >
-            <SelectTrigger className="app-select" aria-label="文字設定を変える項目">
+            <SelectTrigger
+              className="app-select"
+              aria-label="文字設定を変える項目"
+            >
               <span data-slot="select-value" className="flex flex-1 text-left">
                 {TEXT_FIELD_LABELS[selectedField]}
               </span>
             </SelectTrigger>
             <SelectContent>
               {Object.entries(TEXT_FIELD_LABELS).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
+                <SelectItem key={key} value={key}>
+                  {label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -551,12 +683,15 @@ export default function Home() {
               type="color"
               value={selectedStyle.color}
               aria-label={`${TEXT_FIELD_LABELS[selectedField]}の文字色`}
-              onChange={(event) => updateFieldStyle('color', event.target.value)}
+              onChange={(event) =>
+                updateFieldStyle('color', event.target.value)
+              }
             />
             <code>{selectedStyle.color.toUpperCase()}</code>
           </label>
           <label className="size-row">
-            <span>この項目のサイズ</span><strong>{selectedStyle.fontSize}px</strong>
+            <span>この項目のサイズ</span>
+            <strong>{selectedStyle.fontSize}px</strong>
           </label>
           <Slider
             min={12}
@@ -565,7 +700,10 @@ export default function Home() {
             value={[selectedStyle.fontSize]}
             aria-label={`${TEXT_FIELD_LABELS[selectedField]}の文字サイズ`}
             onValueChange={(value) =>
-              updateFieldStyle('fontSize', Array.isArray(value) ? value[0] : value)
+              updateFieldStyle(
+                'fontSize',
+                Array.isArray(value) ? value[0] : value,
+              )
             }
           />
           <Button variant="outline" size="lg" onClick={resetFieldStyle}>
@@ -580,7 +718,8 @@ export default function Home() {
     <div className="form-stack">
       <section className="form-section" aria-labelledby="basic-profile-heading">
         <h2 id="basic-profile-heading" className="section-title">
-          <Heart aria-hidden="true" />プロフィール
+          <Heart aria-hidden="true" />
+          プロフィール
         </h2>
         <div className="field-stack">
           {leftMainFields.slice(0, 2).map((field) => (
@@ -608,7 +747,9 @@ export default function Home() {
                   placeholder="1998年・ヒミツなど"
                   className="app-input"
                   onFocus={() => setSelectedField('birthExtra')}
-                  onChange={(event) => updateValue('birthExtra', event.target.value)}
+                  onChange={(event) =>
+                    updateValue('birthExtra', event.target.value)
+                  }
                 />
               </div>
               <div>
@@ -622,7 +763,10 @@ export default function Home() {
                   aria-label="誕生月"
                   onFocus={() => setSelectedField('birthMonth')}
                   onChange={(event) =>
-                    updateValue('birthMonth', clampNumberText(event.target.value, 12))
+                    updateValue(
+                      'birthMonth',
+                      clampNumberText(event.target.value, 12),
+                    )
                   }
                 />
               </div>
@@ -637,7 +781,10 @@ export default function Home() {
                   aria-label="誕生日の日"
                   onFocus={() => setSelectedField('birthDay')}
                   onChange={(event) =>
-                    updateValue('birthDay', clampNumberText(event.target.value, 31))
+                    updateValue(
+                      'birthDay',
+                      clampNumberText(event.target.value, 31),
+                    )
                   }
                 />
               </div>
@@ -660,7 +807,11 @@ export default function Home() {
           <Field>
             <div className="label-with-count">
               <FieldLabel htmlFor="reason">推しになったきっかけ</FieldLabel>
-              <CountHint value={profile.values.reason} recommended={75} lines={3} />
+              <CountHint
+                value={profile.values.reason}
+                recommended={75}
+                lines={3}
+              />
             </div>
             <Textarea
               id="reason"
@@ -677,7 +828,8 @@ export default function Home() {
 
       <section className="form-section" aria-labelledby="favorites-heading">
         <h2 id="favorites-heading" className="section-title">
-          <Sparkles aria-hidden="true" />好きなもの・思い出
+          <Sparkles aria-hidden="true" />
+          好きなもの・思い出
         </h2>
         <div className="field-stack">
           {leftFavoriteFields.map((field) => (
@@ -702,15 +854,22 @@ export default function Home() {
     <div className="form-stack">
       <section className="form-section" aria-labelledby="activity-heading">
         <h2 id="activity-heading" className="section-title">
-          <Sparkles aria-hidden="true" />わたしの推し活タイプ！
+          <Sparkles aria-hidden="true" />
+          わたしの推し活タイプ！
         </h2>
-        <p className="section-help">星を左右に動かして、今の自分に近い位置を選びます。</p>
+        <p className="section-help">
+          星を左右に動かして、今の自分に近い位置を選びます。
+        </p>
         <div className="activity-stack">
           {ACTIVITY_TYPES.map((item, index) => {
             const value = profile.activityTypes[index];
-            const hint = value === 5 ? 'まんなか' : value < 5 ? '左寄り' : '右寄り';
+            const hint =
+              value === 5 ? 'まんなか' : value < 5 ? '左寄り' : '右寄り';
             return (
-              <Field key={`${item.left}-${item.right}`} className="activity-field">
+              <Field
+                key={`${item.left}-${item.right}`}
+                className="activity-field"
+              >
                 <div className="activity-labels">
                   <span>{item.left}</span>
                   <span className="activity-hint">{hint}</span>
@@ -727,7 +886,9 @@ export default function Home() {
                   onValueChange={(next) => updateActivityType(index, next)}
                 />
                 <div className="slider-ticks" aria-hidden="true">
-                  {Array.from({ length: 11 }, (_, tick) => <span key={tick} />)}
+                  {Array.from({ length: 11 }, (_, tick) => (
+                    <span key={tick} />
+                  ))}
                 </div>
               </Field>
             );
@@ -737,43 +898,43 @@ export default function Home() {
 
       <section className="form-section" aria-labelledby="member-heading">
         <h2 id="member-heading" className="section-title">
-          <Heart aria-hidden="true" />モーニング娘。メンバーでたとえると…？
+          <Heart aria-hidden="true" />
+          モーニング娘。メンバーでたとえると…？
         </h2>
         <p className="section-help">
           現役メンバーを選ぶか、ニックネーム・卒業メンバーなどを自由に入力できます。
         </p>
-        <datalist id="current-members">
-          {CURRENT_MEMBERS.map((member) => <option key={member} value={member}>{member}</option>)}
-        </datalist>
         <div className="member-grid">
           {memberFields.map(({ key, label }) => (
-            <Field key={key}>
-              <FieldLabel htmlFor={key}>{label}</FieldLabel>
-              <Input
-                id={key}
-                list="current-members"
-                value={profile.values[key]}
-                maxLength={24}
-                placeholder="選択または自由入力"
-                className="app-input"
-                onFocus={() => setSelectedField(key)}
-                onChange={(event) => updateValue(key, event.target.value)}
-              />
-            </Field>
+            <MemberInput
+              key={key}
+              fieldKey={key}
+              label={label}
+              value={profile.values[key]}
+              onValueChange={updateValue}
+              onFocus={setSelectedField}
+            />
           ))}
         </div>
-        <p className="member-updated">現役メンバー：公式サイトを2026年9月4日に確認</p>
+        <p className="member-updated">
+          現役メンバー：公式サイトを2026年9月4日に確認
+        </p>
       </section>
 
       <section className="form-section" aria-labelledby="message-heading">
         <h2 id="message-heading" className="section-title">
-          <Sparkles aria-hidden="true" />メッセージ
+          <Sparkles aria-hidden="true" />
+          メッセージ
         </h2>
         <div className="message-grid">
           <Field>
             <div className="label-with-count">
               <FieldLabel htmlFor="message">推しへひとこと♡</FieldLabel>
-              <CountHint value={profile.values.message} recommended={42} lines={3} />
+              <CountHint
+                value={profile.values.message}
+                recommended={42}
+                lines={3}
+              />
             </div>
             <Textarea
               id="message"
@@ -788,7 +949,11 @@ export default function Home() {
           <Field>
             <div className="label-with-count">
               <FieldLabel htmlFor="freeComment">フリーコメント♡</FieldLabel>
-              <CountHint value={profile.values.freeComment} recommended={48} lines={3} />
+              <CountHint
+                value={profile.values.freeComment}
+                recommended={48}
+                lines={3}
+              />
             </div>
             <Textarea
               id="freeComment"
@@ -797,7 +962,9 @@ export default function Home() {
               placeholder="自己紹介や伝えたいことなど"
               className="app-textarea"
               onFocus={() => setSelectedField('freeComment')}
-              onChange={(event) => updateValue('freeComment', event.target.value)}
+              onChange={(event) =>
+                updateValue('freeComment', event.target.value)
+              }
             />
           </Field>
         </div>
@@ -810,7 +977,9 @@ export default function Home() {
     <main className="app-root">
       <header className="app-header">
         <div className="title-lockup">
-          <span className="title-mark" aria-hidden="true">♡</span>
+          <span className="title-mark" aria-hidden="true">
+            ♡
+          </span>
           <div>
             <h1>推し活プロフィールメーカー</h1>
             <p>～Thanks, Chelsea!～</p>
@@ -827,7 +996,10 @@ export default function Home() {
         onValueChange={(value) => setMobileMode(value as MobileMode)}
         className="workspace-tabs"
       >
-        <TabsList className="mobile-mode-tabs" aria-label="入力とプレビューの切り替え">
+        <TabsList
+          className="mobile-mode-tabs"
+          aria-label="入力とプレビューの切り替え"
+        >
           <TabsTrigger value="input">入力する</TabsTrigger>
           <TabsTrigger value="preview">できあがり確認</TabsTrigger>
         </TabsList>
@@ -840,7 +1012,10 @@ export default function Home() {
               <p className="panel-help">すべての項目は空欄でもOKです。</p>
             </div>
           </div>
-          <Tabs value={editorPage} onValueChange={(value) => setEditorPage(value as EditorPage)}>
+          <Tabs
+            value={editorPage}
+            onValueChange={(value) => setEditorPage(value as EditorPage)}
+          >
             <TabsList className="page-tabs" aria-label="入力するページ">
               <TabsTrigger value="left">左ページ</TabsTrigger>
               <TabsTrigger value="right">右ページ</TabsTrigger>
@@ -853,61 +1028,128 @@ export default function Home() {
         <TabsContent value="preview" className="preview-panel">
           <div className="preview-sticky">
             <div className="panel-heading preview-heading">
-              <div><p className="eyebrow">できあがり確認</p><h2>プロフィール画像</h2></div>
+              <div>
+                <p className="eyebrow">できあがり確認</p>
+                <h2>プロフィール画像</h2>
+              </div>
               <ImageIcon aria-hidden="true" />
             </div>
-            <Tabs value={previewView} onValueChange={(value) => setPreviewView(value as PreviewView)}>
-              <TabsList className="page-tabs preview-tabs" aria-label="確認する画像">
+            <Tabs
+              value={previewView}
+              onValueChange={(value) => setPreviewView(value as PreviewView)}
+            >
+              <TabsList
+                className="page-tabs preview-tabs"
+                aria-label="確認する画像"
+              >
                 <TabsTrigger value="left">左</TabsTrigger>
                 <TabsTrigger value="right">右</TabsTrigger>
                 <TabsTrigger value="spread">見開き</TabsTrigger>
               </TabsList>
-              <TabsContent value="left"><ProfileCanvas ref={canvasRef} profile={profile} view="left" /></TabsContent>
-              <TabsContent value="right"><ProfileCanvas ref={canvasRef} profile={profile} view="right" /></TabsContent>
-              <TabsContent value="spread"><ProfileCanvas ref={canvasRef} profile={profile} view="spread" /></TabsContent>
+              <TabsContent value="left">
+                <ProfileCanvas ref={canvasRef} profile={profile} view="left" />
+              </TabsContent>
+              <TabsContent value="right">
+                <ProfileCanvas ref={canvasRef} profile={profile} view="right" />
+              </TabsContent>
+              <TabsContent value="spread">
+                <ProfileCanvas
+                  ref={canvasRef}
+                  profile={profile}
+                  view="spread"
+                />
+              </TabsContent>
             </Tabs>
 
             <div className="export-card">
               <p className="export-title">PNG画像を保存</p>
               <div className="download-grid">
-                <Button variant="outline" size="lg" onClick={() => download('left')}><Download aria-hidden="true" />左ページ</Button>
-                <Button variant="outline" size="lg" onClick={() => download('right')}><Download aria-hidden="true" />右ページ</Button>
-                <Button variant="outline" size="lg" onClick={() => download('spread')}><Download aria-hidden="true" />見開き</Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => download('left')}
+                >
+                  <Download aria-hidden="true" />
+                  左ページ
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => download('right')}
+                >
+                  <Download aria-hidden="true" />
+                  右ページ
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => download('spread')}
+                >
+                  <Download aria-hidden="true" />
+                  見開き
+                </Button>
               </div>
-              <Button className="share-button" size="lg" onClick={shareToX}><Share2 aria-hidden="true" />表示中の画像をXで共有</Button>
-              <p className="share-help">
-                投稿文にサイトURLと #MMプロフィール #さんくすちぇるしー を入れます。画像共有に対応していない端末では、画像保存後にXを開きます。
-              </p>
+              <Button className="share-button" size="lg" onClick={shareToX}>
+                <Share2 aria-hidden="true" />
+                {useXWebFallback
+                  ? '画像を保存してXを開く'
+                  : '表示中の画像をXで共有'}
+              </Button>
             </div>
 
             <AlertDialog>
-              <AlertDialogTrigger render={<Button variant="ghost" size="lg" className="reset-button" />}>
-                <RotateCcw aria-hidden="true" />入力内容をすべて消す
+              <AlertDialogTrigger
+                render={
+                  <Button variant="ghost" size="lg" className="reset-button" />
+                }
+              >
+                <RotateCcw aria-hidden="true" />
+                入力内容をすべて消す
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>入力内容をすべて消しますか？</AlertDialogTitle>
-                  <AlertDialogDescription>文字、スライダー、文字設定が初期状態に戻ります。この操作は元に戻せません。</AlertDialogDescription>
+                  <AlertDialogTitle>
+                    入力内容をすべて消しますか？
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    文字、スライダー、文字設定が初期状態に戻ります。この操作は元に戻せません。
+                  </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" onClick={resetAll}>すべて消す</AlertDialogAction>
+                  <AlertDialogAction variant="destructive" onClick={resetAll}>
+                    すべて消す
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <output className="status-message" aria-live="polite">{status}</output>
+            <output className="status-message" aria-live="polite">
+              {status}
+            </output>
           </div>
         </TabsContent>
       </Tabs>
 
       <footer className="app-footer">
-        <Button variant="outline" size="lg" className="site-share-button" onClick={shareSite}>
-          <Share2 aria-hidden="true" />このサイトをシェアする
+        <Button
+          variant="outline"
+          size="lg"
+          className="site-share-button"
+          onClick={shareSite}
+        >
+          <Share2 aria-hidden="true" />
+          このサイトをシェアする
         </Button>
-        <output className="footer-status" aria-live="polite">{siteShareStatus}</output>
+        <output className="footer-status" aria-live="polite">
+          {siteShareStatus}
+        </output>
         <p>
           作った人：
-          <a href="https://x.com/ikegami1000001h" target="_blank" rel="noopener noreferrer">
+          <a
+            href="https://x.com/ikegami1000001h"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             いけがみ（X）
           </a>
         </p>

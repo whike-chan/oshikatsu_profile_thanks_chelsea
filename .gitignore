@@ -144,3 +144,8 @@ vite.config.ts.timestamp-*
 .vinext/
 .wrangler/
 .pnpm-store/
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/

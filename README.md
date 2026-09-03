@@ -1,1 +1,26 @@
-# oshikatsu_profile_thanks_chelsea
+# 推し活プロフィールメーカー ～Thanks, Chelsea!～
+
+フォームへ入力した内容を、推し活プロフィール画像として保存できるブラウザアプリです。
+入力内容と画像生成は端末内で完結し、外部サーバーへ送信しません。
+
+## 開発
+
+```bash
+pnpm install
+pnpm dev
+```
+
+## 確認
+
+```bash
+pnpm lint
+pnpm build
+```
+
+## 公開
+
+静的サイトとして出力できる構成です。ChatGPT SitesまたはGitHub Pagesへの公開を想定していますが、デプロイ設定はまだ有効化していません。
+
+## メンバー情報
+
+モーニング娘。現役メンバーの候補は `app/profile-types.ts` で管理しています。2026年9月4日に公式サイトを確認した内容です。

@@ -251,7 +251,7 @@ test('PCでは画像を保存してXの投稿画面を開く', async ({ page }) 
   });
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: '表示中の画像をXで共有' }).click();
+  await page.getByRole('button', { name: '画像を保存してXを開く' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('mm-profile-spread.png');
   await expect(
@@ -269,19 +269,36 @@ test('PCでは画像を保存してXの投稿画面を開く', async ({ page }) 
 test('左・右・見開きを共有でき、キャンセル後も再試行できる', async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window.navigator, 'userAgentData', {
+      configurable: true,
+      value: { mobile: true },
+    });
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(
+    (key) => window.localStorage.getItem(key) !== null,
+    STORAGE_KEY,
+  );
   await page.getByRole('tab', { name: 'できあがり確認' }).click();
   await page.evaluate(() => {
     type ShareCall = { fileName: string; userActivation: boolean };
     const state = window as Window & { shareCalls?: ShareCall[] };
     state.shareCalls = [];
+    window.open = (() => ({ opener: null }) as Window) as typeof window.open;
 
     Object.defineProperty(window.navigator, 'canShare', {
       configurable: true,
-      value: () => true,
+      // iOSブラウザではファイル単体の確認は通っても、本文込みの確認が
+      // falseになる場合があるため、判定はファイルだけで行います。
+      value: (data: ShareData) => Boolean(data.files?.length) && !data.text,
     });
     Object.defineProperty(window.navigator, 'share', {
       configurable: true,
-      value: async (data: ShareData) => {
+      value: async function (this: Navigator, data: ShareData) {
+        if (this !== window.navigator) {
+          throw new TypeError('Navigatorをthisとして呼び出す必要があります。');
+        }
         const call = {
           fileName: data.files?.[0]?.name ?? '',
           userActivation: window.navigator.userActivation?.isActive ?? false,
@@ -302,7 +319,21 @@ test('左・右・見開きを共有でき、キャンセル後も再試行で�
   await expect(page.getByText('共有用画像の準備ができました。')).toBeVisible();
   await expect(shareButton).toBeEnabled();
   await shareButton.click();
-  await expect(page.getByText('共有をキャンセルしました。')).toBeVisible();
+  await expect(
+    page.getByText('共有がキャンセルされたか、共有画面を開けませんでした。'),
+  ).toBeVisible();
+
+  const fallbackButton = page.getByRole('button', {
+    name: '画像を保存してXを開く',
+  });
+  await expect(fallbackButton).toBeVisible();
+  const fallbackDownloadPromise = page.waitForEvent('download');
+  await fallbackButton.click();
+  const fallbackDownload = await fallbackDownloadPromise;
+  expect(fallbackDownload.suggestedFilename()).toBe('mm-profile-left.png');
+  await expect(
+    page.getByText('画像を保存し、Xの投稿画面を開きました。'),
+  ).toBeVisible();
 
   await shareButton.click();
   await expect(page.getByText('共有が完了しました。')).toBeVisible();

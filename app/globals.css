@@ -697,6 +697,13 @@
   animation: canvas-spin 0.8s linear infinite;
 }
 
+.share-fallback-button {
+  min-height: 44px;
+  border-color: #c989b3;
+  color: #551547;
+  font-weight: 800;
+}
+
 .status-message {
   margin: 0;
   color: #6d5065;

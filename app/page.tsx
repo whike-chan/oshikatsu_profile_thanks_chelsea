@@ -65,6 +65,20 @@ type PreparedShareImage = {
   blob: Blob;
 };
 
+const isMobileShareDevice = () => {
+  const userAgentData = (
+    navigator as Navigator & { userAgentData?: { mobile?: boolean } }
+  ).userAgentData;
+  if (typeof userAgentData?.mobile === 'boolean') {
+    return userAgentData.mobile;
+  }
+
+  return (
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+};
+
 const fileNames: Record<PreviewView, string> = {
   spread: 'mm-profile-spread.png',
   left: 'mm-profile-left.png',
@@ -288,6 +302,7 @@ export default function Home() {
   const [shareStatus, setShareStatus] = useState('');
   const [siteShareStatus, setSiteShareStatus] = useState('');
   const [useXWebFallback, setUseXWebFallback] = useState(false);
+  const [shareFallbackAvailable, setShareFallbackAvailable] = useState(false);
   const [shareStage, setShareStage] = useState<ShareStage>('idle');
   const [preparedShareImage, setPreparedShareImage] =
     useState<PreparedShareImage | null>(null);
@@ -302,6 +317,8 @@ export default function Home() {
     void preloadProfileBackground().catch(() => undefined);
 
     const initialize = () => {
+      setUseXWebFallback(!isMobileShareDevice());
+
       try {
         const saved = window.localStorage.getItem(PROFILE_STORAGE_KEY);
         if (saved) {
@@ -507,6 +524,7 @@ export default function Home() {
     modeScrollPositions.current[mobileMode] = window.scrollY;
     if (nextMode === 'preview') {
       setPreparedShareImage(null);
+      setShareFallbackAvailable(false);
       setShareStage('preparing');
       setShareStatus('共有用画像を準備しています…');
     } else {
@@ -518,6 +536,7 @@ export default function Home() {
   const changePreviewView = (nextView: PreviewView) => {
     if (nextView === previewView) return;
     setPreparedShareImage(null);
+    setShareFallbackAvailable(false);
     setShareStage('preparing');
     setShareStatus('共有用画像を準備しています…');
     setPreviewView(nextView);
@@ -632,6 +651,23 @@ export default function Home() {
     );
   };
 
+  const shareCurrentImageViaXWeb = () => {
+    if (!preparedShareImage || preparedShareImage.view !== previewView) {
+      setPreparedShareImage(null);
+      setShareFallbackAvailable(false);
+      setShareStage('preparing');
+      setSharePreparationAttempt((attempt) => attempt + 1);
+      setShareStatus('共有用画像を再準備しています…');
+      return;
+    }
+
+    setShareFallbackAvailable(false);
+    setShareStage('sharing');
+    setShareStatus('画像を保存して、Xの投稿画面を開いています…');
+    shareViaXWeb(makeShareText(), preparedShareImage.blob);
+    setShareStage('ready');
+  };
+
   const shareToX = async () => {
     if (
       !preparedShareImage ||
@@ -639,6 +675,7 @@ export default function Home() {
       shareStage === 'error'
     ) {
       setPreparedShareImage(null);
+      setShareFallbackAvailable(false);
       setShareStage('preparing');
       setSharePreparationAttempt((attempt) => attempt + 1);
       setShareStatus('共有用画像を再準備しています…');
@@ -654,11 +691,14 @@ export default function Home() {
       share?: (data: ShareData) => Promise<void>;
       canShare?: (data: ShareData) => boolean;
     };
-    const nativeShare = useXWebFallback ? undefined : shareNavigator.share;
+    const nativeShare = useXWebFallback
+      ? undefined
+      : shareNavigator.share?.bind(navigator);
     const canShareFiles = Boolean(
-      nativeShare && shareNavigator.canShare?.(shareData),
+      nativeShare && shareNavigator.canShare?.({ files: [file] }),
     );
 
+    setShareFallbackAvailable(false);
     setShareStage('sharing');
 
     if (!canShareFiles || !nativeShare) {
@@ -671,13 +711,18 @@ export default function Home() {
     try {
       setShareStatus('端末の共有画面を開いています…');
       await nativeShare(shareData);
+      setShareFallbackAvailable(false);
       setShareStatus('共有が完了しました。');
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        setShareStatus('共有をキャンセルしました。');
+        setShareFallbackAvailable(true);
+        setShareStatus(
+          '共有がキャンセルされたか、共有画面を開けませんでした。別の方法でも共有できます。',
+        );
         return;
       }
       setUseXWebFallback(true);
+      setShareFallbackAvailable(false);
       setShareStatus(
         'この端末向けの共有方法に切り替えました。もう一度押すと、画像を保存してXを開きます。',
       );
@@ -1223,6 +1268,18 @@ export default function Home() {
                   </>
                 )}
               </Button>
+              {shareFallbackAvailable && !useXWebFallback ? (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="share-fallback-button"
+                  disabled={shareStage !== 'ready'}
+                  onClick={shareCurrentImageViaXWeb}
+                >
+                  <Download aria-hidden="true" />
+                  画像を保存してXを開く
+                </Button>
+              ) : null}
               <output
                 id="share-status"
                 className="status-message"

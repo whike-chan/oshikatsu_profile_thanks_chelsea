@@ -42,7 +42,14 @@ pnpm check
 
 ## 公開
 
-静的サイトとして出力し、ChatGPT Sitesで公開しています。
+静的サイトとして出力し、次の2か所で公開しています。
+
+- [ChatGPT Sites版](https://oshikatsu-profile-thanks-chelsea.pekomaro1001.chatgpt.site/)
+- [GitHub Pages版](https://whike-chan.github.io/oshikatsu_profile_thanks_chelsea/)
+
+GitHub Pages版は、`main` ブランチへpushするとGitHub Actionsでテストとビルドを実行し、問題がなければ自動的に公開されます。GitHubのActions画面から `Deploy to GitHub Pages` を手動実行して再公開することもできます。
+
+ChatGPT Sites版はGitHub Pagesとは別に、同じアカウントのWeb版ChatGPTまたはデスクトップアプリから公開・管理します。
 
 ## メンバー情報
 

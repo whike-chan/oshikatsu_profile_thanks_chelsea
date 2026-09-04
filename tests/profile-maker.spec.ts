@@ -40,6 +40,111 @@ test('ページと共有用metaが正しく表示される', async ({ page }) =>
   ).toBeVisible();
 });
 
+test('文字設定は左右ページ共通で、必要なときだけ開ける', async ({ page }) => {
+  const settings = page.locator('details.settings-card');
+
+  await expect(settings).toHaveCount(1);
+  await expect(settings).not.toHaveAttribute('open', '');
+  await expect(settings.getByText('左右ページ共通の設定です')).toBeVisible();
+  await expect(settings.getByLabel('すべての文字色')).toBeHidden();
+
+  await settings.locator('summary').click();
+  await expect(settings).toHaveAttribute('open', '');
+  await expect(settings.getByLabel('すべての文字色')).toBeVisible();
+
+  await page.getByRole('tab', { name: '右ページ' }).click();
+  await expect(settings).toHaveCount(1);
+  await expect(settings.getByLabel('すべての文字色')).toBeVisible();
+});
+
+test('入力欄をTabで順番に移動でき、スマホ向けキー表示を指定する', async ({
+  page,
+}) => {
+  const leftInputOrder = [
+    'name',
+    'account',
+    'birthExtra',
+    'birthMonth',
+    'birthDay',
+    'area',
+    'oshi',
+    'oshiGroup',
+    'history',
+    'reason',
+    'memoryVenue',
+    'favoriteEvent',
+    'favoriteCostume',
+    'favoriteMv',
+    'favoriteSong',
+  ];
+
+  await page.locator('#name').focus();
+  for (const id of leftInputOrder) {
+    await expect(page.locator(`#${id}`)).toBeFocused();
+    if (id !== leftInputOrder.at(-1)) await page.keyboard.press('Tab');
+  }
+
+  await expect(page.locator('#name')).toHaveAttribute('enterkeyhint', 'next');
+  await expect(page.locator('#birthMonth')).toHaveAttribute(
+    'enterkeyhint',
+    'next',
+  );
+  await expect(page.locator('#reason')).toHaveAttribute(
+    'enterkeyhint',
+    'enter',
+  );
+  await expect(page.locator('#favoriteSong')).toHaveAttribute(
+    'enterkeyhint',
+    'done',
+  );
+
+  await page.getByRole('tab', { name: '右ページ' }).click();
+  const firstMember = page.getByRole('combobox', {
+    name: '癒し系といえば？',
+    exact: true,
+  });
+  const secondMember = page.getByRole('combobox', {
+    name: 'しっかり者といえば？',
+    exact: true,
+  });
+  await firstMember.focus();
+  await page.keyboard.press('Tab');
+  await expect(secondMember).toBeFocused();
+  await expect(firstMember).toHaveAttribute('enterkeyhint', 'next');
+  await expect(page.locator('#message')).toHaveAttribute(
+    'enterkeyhint',
+    'enter',
+  );
+});
+
+test('フッターの内容が下部固定操作に隠れない', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+  await expect(page.getByRole('heading', { name: '更新履歴' })).toBeVisible();
+  await expect(page.getByText('2026.09.04 4時頃')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '元ネタ' })).toBeVisible();
+  await expect(
+    page.getByRole('link', {
+      name: '【モーニング娘。推し活講座】メンバー紹介編 前編 (11・12・15・16期メンバー)',
+    }),
+  ).toHaveAttribute('href', 'https://youtu.be/emsxRz_Qo4Y');
+  await expect(
+    page.getByRole('link', {
+      name: '【モーニング娘。推し活講座】メンバー紹介編 後編 (17・18期メンバー)',
+    }),
+  ).toHaveAttribute('href', 'https://youtu.be/Mh_ym_9zpLQ');
+
+  const fixedTabs = await page
+    .getByRole('tablist', { name: '入力とプレビューの切り替え' })
+    .boundingBox();
+  const creator = await page.getByText('作った人：').boundingBox();
+
+  expect(fixedTabs).not.toBeNull();
+  expect(creator).not.toBeNull();
+  expect(creator!.y + creator!.height).toBeLessThan(fixedTabs!.y);
+});
+
 test('入力と確認で、それぞれのスクロール位置を保持する', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));

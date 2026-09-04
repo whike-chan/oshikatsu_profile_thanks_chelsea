@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Autocomplete } from '@base-ui/react/autocomplete';
 import {
+  ChevronDown,
   Download,
   Heart,
   ImageIcon,
@@ -25,7 +26,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -189,6 +189,7 @@ function AppInput({
   label,
   placeholder,
   maxLength,
+  enterKeyHint = 'next',
   value,
   onValueChange,
   onFocus,
@@ -197,6 +198,7 @@ function AppInput({
   label: string;
   placeholder: string;
   maxLength: number;
+  enterKeyHint?: React.ComponentProps<'input'>['enterKeyHint'];
   value: string;
   onValueChange: (key: TextFieldKey, value: string) => void;
   onFocus: (key: TextFieldKey) => void;
@@ -206,6 +208,8 @@ function AppInput({
       <FieldLabel htmlFor={fieldKey}>{label}</FieldLabel>
       <Input
         id={fieldKey}
+        data-profile-input
+        enterKeyHint={enterKeyHint}
         value={value}
         maxLength={maxLength}
         placeholder={placeholder}
@@ -242,6 +246,8 @@ function MemberInput({
       >
         <Autocomplete.Input
           id={fieldKey}
+          data-profile-input
+          enterKeyHint="next"
           maxLength={24}
           placeholder="選択または自由入力"
           className="app-input"
@@ -759,15 +765,43 @@ export default function Home() {
     }
   };
 
+  const moveBetweenProfileInputs = (
+    event: React.KeyboardEvent<HTMLFormElement>,
+  ) => {
+    if (event.key !== 'Tab') return;
+    if (!(event.target instanceof HTMLElement)) return;
+    if (!event.target.matches('[data-profile-input]')) return;
+
+    const controls = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>('[data-profile-input]'),
+    ).filter(
+      (control) =>
+        control.getClientRects().length > 0 &&
+        !control.hasAttribute('disabled') &&
+        control.getAttribute('aria-disabled') !== 'true',
+    );
+    const currentIndex = controls.indexOf(event.target);
+    const nextIndex = currentIndex + (event.shiftKey ? -1 : 1);
+    const nextControl = controls[nextIndex];
+
+    if (!nextControl) return;
+    event.preventDefault();
+    nextControl.focus();
+  };
+
   const renderTextSettings = () => (
-    <Card className="settings-card">
-      <CardHeader>
-        <CardTitle className="section-title">
+    <details className="settings-card">
+      <summary className="settings-summary">
+        <span className="settings-summary-title">
           <Palette aria-hidden="true" />
-          文字の見た目
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="settings-grid">
+          <span>
+            <strong>文字の見た目（任意）</strong>
+            <small>左右ページ共通の設定です</small>
+          </span>
+        </span>
+        <ChevronDown className="settings-chevron" aria-hidden="true" />
+      </summary>
+      <div className="settings-grid settings-body">
         <div className="setting-group">
           <p className="setting-heading">すべての文字</p>
           <label className="color-row">
@@ -856,8 +890,8 @@ export default function Home() {
             この項目を全体設定に戻す
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </details>
   );
 
   const leftForm = (
@@ -888,6 +922,8 @@ export default function Home() {
                 <span className="mini-label">年・補足</span>
                 <Input
                   id="birthExtra"
+                  data-profile-input
+                  enterKeyHint="next"
                   value={profile.values.birthExtra}
                   maxLength={12}
                   placeholder="1998年・ヒミツなど"
@@ -901,6 +937,9 @@ export default function Home() {
               <div>
                 <span className="mini-label">月</span>
                 <Input
+                  id="birthMonth"
+                  data-profile-input
+                  enterKeyHint="next"
                   value={profile.values.birthMonth}
                   inputMode="numeric"
                   maxLength={2}
@@ -919,6 +958,9 @@ export default function Home() {
               <div>
                 <span className="mini-label">日</span>
                 <Input
+                  id="birthDay"
+                  data-profile-input
+                  enterKeyHint="next"
                   value={profile.values.birthDay}
                   inputMode="numeric"
                   maxLength={2}
@@ -961,6 +1003,8 @@ export default function Home() {
             </div>
             <Textarea
               id="reason"
+              data-profile-input
+              enterKeyHint="enter"
               rows={3}
               value={profile.values.reason}
               placeholder="きっかけや、そのときの思い出など"
@@ -985,6 +1029,7 @@ export default function Home() {
               label={field.label}
               placeholder={field.placeholder}
               maxLength={field.maxLength}
+              enterKeyHint={field.key === 'favoriteSong' ? 'done' : 'next'}
               value={profile.values[field.key]}
               onValueChange={updateValue}
               onFocus={setSelectedField}
@@ -992,7 +1037,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-      {renderTextSettings()}
     </div>
   );
 
@@ -1084,6 +1128,8 @@ export default function Home() {
             </div>
             <Textarea
               id="message"
+              data-profile-input
+              enterKeyHint="enter"
               rows={3}
               value={profile.values.message}
               placeholder="推しへの気持ちを自由に"
@@ -1103,6 +1149,8 @@ export default function Home() {
             </div>
             <Textarea
               id="freeComment"
+              data-profile-input
+              enterKeyHint="enter"
               rows={3}
               value={profile.values.freeComment}
               placeholder="自己紹介や伝えたいことなど"
@@ -1115,7 +1163,6 @@ export default function Home() {
           </Field>
         </div>
       </section>
-      {renderTextSettings()}
     </div>
   );
 
@@ -1158,17 +1205,23 @@ export default function Home() {
               <p className="panel-help">すべての項目は空欄でもOKです。</p>
             </div>
           </div>
-          <Tabs
-            value={editorPage}
-            onValueChange={(value) => setEditorPage(value as EditorPage)}
+          <form
+            onKeyDownCapture={moveBetweenProfileInputs}
+            onSubmit={(event) => event.preventDefault()}
           >
-            <TabsList className="page-tabs" aria-label="入力するページ">
-              <TabsTrigger value="left">左ページ</TabsTrigger>
-              <TabsTrigger value="right">右ページ</TabsTrigger>
-            </TabsList>
-            <TabsContent value="left">{leftForm}</TabsContent>
-            <TabsContent value="right">{rightForm}</TabsContent>
-          </Tabs>
+            <Tabs
+              value={editorPage}
+              onValueChange={(value) => setEditorPage(value as EditorPage)}
+            >
+              <TabsList className="page-tabs" aria-label="入力するページ">
+                <TabsTrigger value="left">左ページ</TabsTrigger>
+                <TabsTrigger value="right">右ページ</TabsTrigger>
+              </TabsList>
+              <TabsContent value="left">{leftForm}</TabsContent>
+              <TabsContent value="right">{rightForm}</TabsContent>
+            </Tabs>
+            {renderTextSettings()}
+          </form>
         </TabsContent>
 
         <TabsContent value="preview" className="preview-panel">
@@ -1323,28 +1376,85 @@ export default function Home() {
       </Tabs>
 
       <footer className="app-footer">
-        <Button
-          variant="outline"
-          size="lg"
-          className="site-share-button"
-          onClick={shareSite}
-        >
-          <Share2 aria-hidden="true" />
-          このサイトをシェアする
-        </Button>
-        <output className="footer-status" aria-live="polite">
-          {siteShareStatus}
-        </output>
-        <p>
-          作った人：
-          <a
-            href="https://x.com/ikegami1000001h"
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="footer-share">
+          <Button
+            variant="outline"
+            size="lg"
+            className="site-share-button"
+            onClick={shareSite}
           >
-            いけがみ（X）
-          </a>
-        </p>
+            <Share2 aria-hidden="true" />
+            このサイトをシェアする
+          </Button>
+          <output className="footer-status" aria-live="polite">
+            {siteShareStatus}
+          </output>
+        </div>
+
+        <div className="footer-meta">
+          <section className="update-history" aria-labelledby="updates-heading">
+            <h2 id="updates-heading">更新履歴</h2>
+            <ul>
+              <li>
+                <time dateTime="2026-09-04T19:00:00+09:00">
+                  2026.09.04 19時頃
+                </time>
+                <span>
+                  入力画面を使いやすくしました。フッターを整理しました
+                </span>
+              </li>
+              <li>
+                <time dateTime="2026-09-04T16:00:00+09:00">
+                  2026.09.04 16時頃
+                </time>
+                <span>
+                  「わたしの推し活タイプ！」の文字が隠れる問題を修正しました
+                </span>
+              </li>
+              <li>
+                <time dateTime="2026-09-04T04:00:00+09:00">
+                  2026.09.04 4時頃
+                </time>
+                <span>公開</span>
+              </li>
+            </ul>
+          </section>
+          <section className="original-source" aria-labelledby="source-heading">
+            <h2 id="source-heading">元ネタ</h2>
+            <ul>
+              <li>
+                <a
+                  href="https://youtu.be/emsxRz_Qo4Y"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  【モーニング娘。推し活講座】メンバー紹介編 前編
+                  (11・12・15・16期メンバー)
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://youtu.be/Mh_ym_9zpLQ"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  【モーニング娘。推し活講座】メンバー紹介編 後編
+                  (17・18期メンバー)
+                </a>
+              </li>
+            </ul>
+          </section>
+          <p className="creator-credit">
+            作った人：
+            <a
+              href="https://x.com/ikegami1000001h"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              いけがみ（X）
+            </a>
+          </p>
+        </div>
       </footer>
     </main>
   );

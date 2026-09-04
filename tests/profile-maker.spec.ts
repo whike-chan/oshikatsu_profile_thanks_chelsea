@@ -40,6 +40,68 @@ test('ページと共有用metaが正しく表示される', async ({ page }) =>
   ).toBeVisible();
 });
 
+test('入力と確認で、それぞれのスクロール位置を保持する', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const inputScrollPosition = await page.evaluate(() => window.scrollY);
+  expect(inputScrollPosition).toBeGreaterThan(500);
+
+  await page.getByRole('tab', { name: 'できあがり確認' }).click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
+  await page.evaluate(() => window.scrollTo(0, 300));
+  const previewScrollPosition = await page.evaluate(() => window.scrollY);
+  expect(previewScrollPosition).toBeGreaterThan(0);
+
+  await page.getByRole('tab', { name: '入力する' }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBe(inputScrollPosition);
+
+  await page.getByRole('tab', { name: 'できあがり確認' }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBe(previewScrollPosition);
+});
+
+test('背景画像を入力中から読み込み、準備中は案内を表示する', async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const previewPage = await context.newPage();
+  let releaseImageRequest = () => {};
+  const imageRequestGate = new Promise<void>((resolve) => {
+    releaseImageRequest = resolve;
+  });
+
+  await previewPage.route('**/oshikatsu-profile.jpg', async (route) => {
+    await imageRequestGate;
+    await route.continue();
+  });
+
+  try {
+    await previewPage.goto('http://localhost:3000/', {
+      waitUntil: 'domcontentloaded',
+    });
+    await previewPage.waitForFunction(
+      (key) => window.localStorage.getItem(key) !== null,
+      STORAGE_KEY,
+    );
+    await previewPage.getByRole('tab', { name: 'できあがり確認' }).click();
+    await expect(
+      previewPage.getByText('プロフィール画像を読み込み中…'),
+    ).toBeVisible();
+
+    releaseImageRequest();
+    await expect(
+      previewPage.getByText('プロフィール画像を読み込み中…'),
+    ).toBeHidden();
+  } finally {
+    releaseImageRequest();
+    await context.close();
+  }
+});
+
 test('スマホでも現役メンバー全員を候補表示し、自由入力もできる', async ({
   page,
 }) => {

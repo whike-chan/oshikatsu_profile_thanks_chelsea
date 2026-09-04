@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Autocomplete } from '@base-ui/react/autocomplete';
 import {
   Download,
@@ -37,7 +37,11 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
-import { ProfileCanvas, type ProfileCanvasHandle } from './profile-canvas';
+import {
+  preloadProfileBackground,
+  ProfileCanvas,
+  type ProfileCanvasHandle,
+} from './profile-canvas';
 import {
   ACTIVITY_TYPES,
   CURRENT_MEMBERS,
@@ -277,8 +281,14 @@ export default function Home() {
   const [siteShareStatus, setSiteShareStatus] = useState('');
   const [useXWebFallback, setUseXWebFallback] = useState(false);
   const canvasRef = useRef<ProfileCanvasHandle>(null);
+  const modeScrollPositions = useRef<Record<MobileMode, number>>({
+    input: 0,
+    preview: 0,
+  });
 
   useEffect(() => {
+    void preloadProfileBackground().catch(() => undefined);
+
     const initialize = () => {
       try {
         const saved = window.localStorage.getItem(PROFILE_STORAGE_KEY);
@@ -311,6 +321,10 @@ export default function Home() {
     const timeout = window.setTimeout(initialize, 0);
     return () => window.clearTimeout(timeout);
   }, []);
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, modeScrollPositions.current[mobileMode]);
+  }, [mobileMode]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -429,6 +443,12 @@ export default function Home() {
       ...current,
       values: { ...current.values, [key]: value },
     }));
+  };
+
+  const changeMobileMode = (nextMode: MobileMode) => {
+    if (nextMode === mobileMode) return;
+    modeScrollPositions.current[mobileMode] = window.scrollY;
+    setMobileMode(nextMode);
   };
 
   const updateActivityType = (
@@ -993,7 +1013,7 @@ export default function Home() {
 
       <Tabs
         value={mobileMode}
-        onValueChange={(value) => setMobileMode(value as MobileMode)}
+        onValueChange={(value) => changeMobileMode(value as MobileMode)}
         className="workspace-tabs"
       >
         <TabsList

@@ -22,6 +22,32 @@ const PAGE_WIDTH = WIDTH / 2;
 const FONT_FAMILY =
   'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Yu Gothic UI", "Hiragino Sans", sans-serif';
 
+let backgroundImageRequest: Promise<HTMLImageElement> | null = null;
+
+export const preloadProfileBackground = () => {
+  if (backgroundImageRequest) return backgroundImageRequest;
+
+  const request = new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const finish = () => resolve(image);
+      if (typeof image.decode === 'function') {
+        void image.decode().then(finish, finish);
+      } else {
+        finish();
+      }
+    };
+    image.onerror = () => reject(new Error('背景画像を読み込めませんでした。'));
+    image.src = new URL('oshikatsu-profile.jpg', document.baseURI).toString();
+  });
+
+  backgroundImageRequest = request;
+  void request.catch(() => {
+    if (backgroundImageRequest === request) backgroundImageRequest = null;
+  });
+  return request;
+};
+
 export type ProfileCanvasHandle = {
   makeBlob: (view: PreviewView) => Promise<Blob>;
 };
@@ -281,13 +307,20 @@ export const ProfileCanvas = forwardRef<ProfileCanvasHandle, Props>(
     const [backgroundMissing, setBackgroundMissing] = useState(false);
 
     useEffect(() => {
-      const image = new Image();
-      image.onload = () => {
-        setBackground(image);
-        setBackgroundMissing(false);
+      let active = true;
+      void preloadProfileBackground().then(
+        (image) => {
+          if (!active) return;
+          setBackground(image);
+          setBackgroundMissing(false);
+        },
+        () => {
+          if (active) setBackgroundMissing(true);
+        },
+      );
+      return () => {
+        active = false;
       };
-      image.onerror = () => setBackgroundMissing(true);
-      image.src = new URL('oshikatsu-profile.jpg', document.baseURI).toString();
     }, []);
 
     useEffect(() => {
@@ -304,7 +337,19 @@ export const ProfileCanvas = forwardRef<ProfileCanvasHandle, Props>(
       ref,
       () => ({
         makeBlob: async (outputView) => {
-          const output = renderOutputCanvas(profile, background, outputView);
+          let outputBackground = background;
+          if (!outputBackground && !backgroundMissing) {
+            try {
+              outputBackground = await preloadProfileBackground();
+            } catch {
+              // The fallback canvas remains available when the source image fails.
+            }
+          }
+          const output = renderOutputCanvas(
+            profile,
+            outputBackground,
+            outputView,
+          );
           const blob = await new Promise<Blob | null>((resolve) =>
             output.toBlob(resolve, 'image/png'),
           );
@@ -312,18 +357,30 @@ export const ProfileCanvas = forwardRef<ProfileCanvasHandle, Props>(
           return blob;
         },
       }),
-      [background, profile],
+      [background, backgroundMissing, profile],
     );
 
+    const backgroundLoading = !background && !backgroundMissing;
+
     return (
-      <div className="canvas-shell">
+      <div className="canvas-shell" aria-busy={backgroundLoading}>
         <canvas
           ref={canvasRef}
-          className="profile-canvas"
+          className={
+            backgroundLoading
+              ? 'profile-canvas profile-canvas-loading'
+              : 'profile-canvas'
+          }
           aria-label="入力内容を反映した推し活プロフィールのプレビュー"
         >
           入力内容を反映した推し活プロフィールのプレビュー
         </canvas>
+        {backgroundLoading && (
+          <output className="canvas-loading">
+            <span className="canvas-loading-spinner" aria-hidden="true" />
+            プロフィール画像を読み込み中…
+          </output>
+        )}
         {backgroundMissing && (
           <output className="canvas-notice">
             背景画像を読み込めませんでした。再読み込みしてください。

@@ -29,7 +29,19 @@ test('ページと共有用metaが正しく表示される', async ({ page }) =>
   );
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
     'content',
-    'https://oshikatsu-profile-thanks-chelsea.pekomaro1001.chatgpt.site/og.png',
+    'https://whike-chan.github.io/oshikatsu_profile_thanks_chelsea/og.png?v=20260904-2',
+  );
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute(
+    'content',
+    '1731',
+  );
+  await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute(
+    'content',
+    'https://whike-chan.github.io/oshikatsu_profile_thanks_chelsea/og.png?v=20260904-2',
+  );
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+    'href',
+    '/favicon.png',
   );
   await expect(page.getByRole('tab', { name: '左ページ' })).toHaveCSS(
     'cursor',
@@ -85,6 +97,7 @@ test('入力欄をTabで順番に移動でき、スマホ向けキー表示を�
   }
 
   await expect(page.locator('#name')).toHaveAttribute('enterkeyhint', 'next');
+  await expect(page.locator('#name')).toHaveAttribute('autocomplete', 'off');
   await expect(page.locator('#birthMonth')).toHaveAttribute(
     'enterkeyhint',
     'next',
@@ -93,6 +106,7 @@ test('入力欄をTabで順番に移動でき、スマホ向けキー表示を�
     'enterkeyhint',
     'enter',
   );
+  await expect(page.locator('form')).toHaveAttribute('autocomplete', 'off');
   await expect(page.locator('#favoriteSong')).toHaveAttribute(
     'enterkeyhint',
     'done',
@@ -122,8 +136,16 @@ test('フッターの内容が下部固定操作に隠れない', async ({ page 
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
   await expect(page.getByRole('heading', { name: '更新履歴' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '更新履歴' })).toHaveCSS(
+    'text-align',
+    'left',
+  );
   await expect(page.getByText('2026.09.04 4時頃')).toBeVisible();
   await expect(page.getByRole('heading', { name: '元ネタ' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '元ネタ' })).toHaveCSS(
+    'text-align',
+    'left',
+  );
   await expect(
     page.getByRole('link', {
       name: '【モーニング娘。推し活講座】メンバー紹介編 前編 (11・12・15・16期メンバー)',
@@ -142,7 +164,9 @@ test('フッターの内容が下部固定操作に隠れない', async ({ page 
 
   expect(fixedTabs).not.toBeNull();
   expect(creator).not.toBeNull();
-  expect(creator!.y + creator!.height).toBeLessThan(fixedTabs!.y);
+  expect(fixedTabs!.y - (creator!.y + creator!.height)).toBeGreaterThanOrEqual(
+    48,
+  );
 });
 
 test('入力と確認で、それぞれのスクロール位置を保持する', async ({ page }) => {
@@ -450,6 +474,7 @@ test('PCでは画像を保存してXの投稿画面を開く', async ({ page }) 
 test('左・右・見開きを共有でき、キャンセル後も再試行できる', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     Object.defineProperty(window.navigator, 'userAgentData', {
       configurable: true,
@@ -485,6 +510,14 @@ test('左・右・見開きを共有でき、キャンセル後も再試行で�
           userActivation: window.navigator.userActivation?.isActive ?? false,
         };
         state.shareCalls?.push(call);
+        document.body.style.paddingBottom = '2000px';
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        await new Promise<void>((resolve) =>
+          window.requestAnimationFrame(() => {
+            document.body.style.paddingBottom = '';
+            resolve();
+          }),
+        );
         if (state.shareCalls?.length === 1) {
           throw new DOMException('共有をキャンセル', 'AbortError');
         }
@@ -499,10 +532,16 @@ test('左・右・見開きを共有でき、キャンセル後も再試行で�
   await page.getByRole('tab', { name: '左', exact: true }).click();
   await expect(page.getByText('共有用画像の準備ができました。')).toBeVisible();
   await expect(shareButton).toBeEnabled();
+  await shareButton.scrollIntoViewIfNeeded();
+  const scrollBeforeShare = await page.evaluate(() => window.scrollY);
   await shareButton.click();
   await expect(
     page.getByText('共有がキャンセルされたか、共有画面を開けませんでした。'),
   ).toBeVisible();
+  await page.waitForTimeout(300);
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBe(scrollBeforeShare);
 
   const fallbackButton = page.getByRole('button', {
     name: '画像を保存してXを開く',

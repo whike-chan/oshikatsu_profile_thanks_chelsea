@@ -209,6 +209,7 @@ function AppInput({
       <Input
         id={fieldKey}
         data-profile-input
+        autoComplete="off"
         enterKeyHint={enterKeyHint}
         value={value}
         maxLength={maxLength}
@@ -247,6 +248,7 @@ function MemberInput({
         <Autocomplete.Input
           id={fieldKey}
           data-profile-input
+          autoComplete="off"
           enterKeyHint="next"
           maxLength={24}
           placeholder="選択または自由入力"
@@ -674,6 +676,21 @@ export default function Home() {
     setShareStage('ready');
   };
 
+  const restoreScrollAfterNativeShare = (scrollTop: number) => {
+    const restore = () => {
+      const maxScroll = Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight,
+      );
+      const nextScrollTop = Math.min(scrollTop, maxScroll);
+      window.scrollTo({ top: nextScrollTop, behavior: 'auto' });
+      modeScrollPositions.current.preview = nextScrollTop;
+    };
+
+    window.requestAnimationFrame(restore);
+    window.setTimeout(restore, 250);
+  };
+
   const shareToX = async () => {
     if (
       !preparedShareImage ||
@@ -703,6 +720,7 @@ export default function Home() {
     const canShareFiles = Boolean(
       nativeShare && shareNavigator.canShare?.({ files: [file] }),
     );
+    const scrollTopBeforeShare = window.scrollY;
 
     setShareFallbackAvailable(false);
     setShareStage('sharing');
@@ -734,6 +752,7 @@ export default function Home() {
       );
     } finally {
       setShareStage('ready');
+      restoreScrollAfterNativeShare(scrollTopBeforeShare);
     }
   };
 
@@ -923,6 +942,7 @@ export default function Home() {
                 <Input
                   id="birthExtra"
                   data-profile-input
+                  autoComplete="off"
                   enterKeyHint="next"
                   value={profile.values.birthExtra}
                   maxLength={12}
@@ -939,6 +959,7 @@ export default function Home() {
                 <Input
                   id="birthMonth"
                   data-profile-input
+                  autoComplete="off"
                   enterKeyHint="next"
                   value={profile.values.birthMonth}
                   inputMode="numeric"
@@ -960,6 +981,7 @@ export default function Home() {
                 <Input
                   id="birthDay"
                   data-profile-input
+                  autoComplete="off"
                   enterKeyHint="next"
                   value={profile.values.birthDay}
                   inputMode="numeric"
@@ -1004,6 +1026,7 @@ export default function Home() {
             <Textarea
               id="reason"
               data-profile-input
+              autoComplete="off"
               enterKeyHint="enter"
               rows={3}
               value={profile.values.reason}
@@ -1129,6 +1152,7 @@ export default function Home() {
             <Textarea
               id="message"
               data-profile-input
+              autoComplete="off"
               enterKeyHint="enter"
               rows={3}
               value={profile.values.message}
@@ -1150,6 +1174,7 @@ export default function Home() {
             <Textarea
               id="freeComment"
               data-profile-input
+              autoComplete="off"
               enterKeyHint="enter"
               rows={3}
               value={profile.values.freeComment}
@@ -1206,6 +1231,7 @@ export default function Home() {
             </div>
           </div>
           <form
+            autoComplete="off"
             onKeyDownCapture={moveBetweenProfileInputs}
             onSubmit={(event) => event.preventDefault()}
           >
@@ -1395,6 +1421,12 @@ export default function Home() {
           <section className="update-history" aria-labelledby="updates-heading">
             <h2 id="updates-heading">更新履歴</h2>
             <ul>
+              <li>
+                <time dateTime="2026-09-04T20:00:00+09:00">
+                  2026.09.04 20時頃
+                </time>
+                <span>faviconを作りました</span>
+              </li>
               <li>
                 <time dateTime="2026-09-04T19:00:00+09:00">
                   2026.09.04 19時頃

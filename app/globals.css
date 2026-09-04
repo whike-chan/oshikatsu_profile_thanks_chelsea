@@ -175,7 +175,7 @@
 .mobile-mode-tabs {
   position: fixed;
   right: auto;
-  bottom: max(1rem, env(safe-area-inset-bottom));
+  bottom: clamp(1rem, env(safe-area-inset-bottom), 2.25rem);
   left: 50%;
   z-index: 50;
   display: flex;
@@ -791,7 +791,7 @@
   gap: 1.25rem;
   width: min(748px, calc(100% - 2rem));
   margin: 2.5rem auto 0;
-  padding: 2rem 0 calc(6rem + max(1rem, env(safe-area-inset-bottom)));
+  padding: 2rem 0 calc(9rem + clamp(1rem, env(safe-area-inset-bottom), 2.25rem));
   border-top: 1px solid rgb(161 61 123 / 22%);
   color: #5a3152;
   font-size: 0.9rem;
@@ -844,6 +844,12 @@
   font-weight: 800;
 }
 
+.update-history,
+.original-source {
+  width: 100%;
+  text-align: left;
+}
+
 .update-history ul {
   display: grid;
   gap: 0.35rem;
@@ -868,7 +874,6 @@
 }
 
 .original-source {
-  width: 100%;
   padding-top: 0.9rem;
   border-top: 1px dotted #e7cadc;
   color: #73566c;
@@ -992,7 +997,7 @@
   .update-history li {
     grid-template-columns: 1fr;
     gap: 0;
-    text-align: center;
+    text-align: left;
   }
 }
 

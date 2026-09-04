@@ -8,12 +8,20 @@ const description =
 const siteUrl = new URL(
   'https://oshikatsu-profile-thanks-chelsea.pekomaro1001.chatgpt.site',
 );
+const ogImageUrl =
+  'https://whike-chan.github.io/oshikatsu_profile_thanks_chelsea/og.png?v=20260904-2';
+const publicBasePath = process.env.PAGES_BASE_PATH?.replace(/\/$/, '') ?? '';
+const faviconPath = `${publicBasePath}/favicon.png`;
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
   title,
   description,
   applicationName: title,
+  icons: {
+    icon: [{ url: faviconPath, type: 'image/png', sizes: '512x512' }],
+    apple: [{ url: faviconPath, type: 'image/png', sizes: '512x512' }],
+  },
   alternates: {
     canonical: '/',
   },
@@ -29,10 +37,11 @@ export const metadata: Metadata = {
     url: '/',
     images: [
       {
-        url: '/og.png',
-        width: 1733,
+        url: ogImageUrl,
+        width: 1731,
         height: 909,
         alt: title,
+        type: 'image/png',
       },
     ],
   },
@@ -40,7 +49,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title,
     description,
-    images: ['/og.png'],
+    images: [{ url: ogImageUrl, alt: title }],
   },
 };
 

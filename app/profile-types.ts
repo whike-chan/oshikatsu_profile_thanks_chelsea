@@ -105,8 +105,8 @@ export const TEXT_FIELD_LABELS: Record<TextFieldKey, string> = {
   memberFashionable: 'おしゃれといえば？',
   memberNatural: '天然といえば？',
   memberFriend: '親友になりたいメンバーといえば？',
-  message: '推しへひとこと♡',
-  freeComment: 'フリーコメント♡',
+  message: '推しへひとこと',
+  freeComment: 'フリーコメント',
 };
 
 export const CURRENT_MEMBERS = [

@@ -135,7 +135,7 @@ test('入力内容を端末内へ保存し、再読み込み後に復元する',
     .fill('ライブで一目惚れしました');
 
   await page.getByRole('tab', { name: '右ページ' }).click();
-  await page.getByLabel('推しへひとこと♡').fill('いつもありがとう！');
+  await page.getByLabel('推しへひとこと').fill('いつもありがとう！');
   const firstActivitySlider = page
     .getByRole('group', { name: '前方派から後方派' })
     .getByRole('slider');
@@ -168,7 +168,7 @@ test('入力内容を端末内へ保存し、再読み込み後に復元する',
   await expect(page.getByLabel('誕生日の日')).toHaveValue('31');
 
   await page.getByRole('tab', { name: '右ページ' }).click();
-  await expect(page.getByLabel('推しへひとこと♡')).toHaveValue(
+  await expect(page.getByLabel('推しへひとこと')).toHaveValue(
     'いつもありがとう！',
   );
   await expect(
@@ -196,6 +196,82 @@ test('プレビューを表示してPNG画像を保存できる', async ({ page 
 
   expect(download.suggestedFilename()).toBe('mm-profile-left.png');
   await expect(page.getByText('画像を保存しました。')).toBeVisible();
+});
+
+test('推し活タイプの破線が左側の項目名を隠さない', async ({ page }) => {
+  await page.getByRole('tab', { name: 'できあがり確認' }).click();
+  await page.getByRole('tab', { name: '右' }).click();
+
+  const canvas = page.getByLabel(
+    '入力内容を反映した推し活プロフィールのプレビュー',
+  );
+  await expect
+    .poll(() =>
+      canvas.evaluate((element) => (element as HTMLCanvasElement).width),
+    )
+    .toBe(768);
+
+  const comparison = await canvas.evaluate(async (element) => {
+    const actualCanvas = element as HTMLCanvasElement;
+    const actualContext = actualCanvas.getContext('2d');
+    if (!actualContext) throw new Error('プレビューを読み取れません。');
+
+    const background = new Image();
+    background.src = new URL(
+      'oshikatsu-profile.jpg',
+      document.baseURI,
+    ).toString();
+    await background.decode();
+
+    const referenceCanvas = document.createElement('canvas');
+    referenceCanvas.width = background.naturalWidth;
+    referenceCanvas.height = background.naturalHeight;
+    const referenceContext = referenceCanvas.getContext('2d');
+    if (!referenceContext) throw new Error('元画像を読み取れません。');
+    referenceContext.drawImage(background, 0, 0);
+
+    const preservedLabels = [
+      { x: 940, y: 359, width: 36 },
+      { x: 940, y: 440, width: 40 },
+      { x: 940, y: 520, width: 38 },
+    ];
+    let changedLabelPixels = 0;
+    for (const area of preservedLabels) {
+      const actual = actualContext.getImageData(
+        area.x - 768,
+        area.y - 10,
+        area.width,
+        20,
+      ).data;
+      const reference = referenceContext.getImageData(
+        area.x,
+        area.y - 10,
+        area.width,
+        20,
+      ).data;
+      for (let index = 0; index < actual.length; index += 1) {
+        if (actual[index] !== reference[index]) changedLabelPixels += 1;
+      }
+    }
+
+    const rows = [197, 238, 278, 319, 359, 399, 440, 480, 520];
+    const backgroundColor = [255, 250, 253, 255];
+    const lineStartsAtStar = rows.every((y) => {
+      const beforeLine = [...actualContext.getImageData(234, y, 1, 1).data];
+      const lineStart = [...actualContext.getImageData(244, y, 1, 1).data];
+      return (
+        beforeLine.every(
+          (channel, index) => channel === backgroundColor[index],
+        ) &&
+        lineStart.some((channel, index) => channel !== backgroundColor[index])
+      );
+    });
+
+    return { changedLabelPixels, lineStartsAtStar };
+  });
+
+  expect(comparison.changedLabelPixels).toBe(0);
+  expect(comparison.lineStartsAtStar).toBe(true);
 });
 
 test('確認後に入力内容をすべて消去できる', async ({ page }) => {

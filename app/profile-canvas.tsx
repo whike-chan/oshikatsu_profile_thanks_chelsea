@@ -243,11 +243,19 @@ const drawProfile = (
   drawParagraph('freeComment', 1154, 876, 336);
 
   const sliderY = [197, 238, 278, 319, 359, 399, 440, 480, 520];
-  const sliderStart = 956;
+  const sliderClearStart = [950, 950, 950, 950, 976, 952, 980, 950, 978];
+  // Keep the editable slider clear of the longer labels printed on the background.
+  const sliderStart = 1012;
   const sliderEnd = 1317;
   sliderY.forEach((y, index) => {
     context.save();
     context.fillStyle = '#fffafd';
+    context.fillRect(
+      sliderClearStart[index],
+      y - 7,
+      sliderStart - sliderClearStart[index],
+      14,
+    );
     context.fillRect(sliderStart - 4, y - 11, sliderEnd - sliderStart + 8, 22);
     context.beginPath();
     context.setLineDash([1, 5]);

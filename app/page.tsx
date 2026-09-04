@@ -1075,7 +1075,7 @@ export default function Home() {
         <div className="message-grid">
           <Field>
             <div className="label-with-count">
-              <FieldLabel htmlFor="message">推しへひとこと♡</FieldLabel>
+              <FieldLabel htmlFor="message">推しへひとこと</FieldLabel>
               <CountHint
                 value={profile.values.message}
                 recommended={42}
@@ -1094,7 +1094,7 @@ export default function Home() {
           </Field>
           <Field>
             <div className="label-with-count">
-              <FieldLabel htmlFor="freeComment">フリーコメント♡</FieldLabel>
+              <FieldLabel htmlFor="freeComment">フリーコメント</FieldLabel>
               <CountHint
                 value={profile.values.freeComment}
                 recommended={48}

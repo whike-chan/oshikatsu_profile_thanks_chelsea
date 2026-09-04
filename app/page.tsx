@@ -6,6 +6,7 @@ import {
   Download,
   Heart,
   ImageIcon,
+  LoaderCircle,
   Palette,
   RotateCcw,
   Share2,
@@ -57,6 +58,12 @@ import {
 
 type MobileMode = 'input' | 'preview';
 type EditorPage = 'left' | 'right';
+type ShareStage = 'idle' | 'preparing' | 'ready' | 'sharing' | 'error';
+
+type PreparedShareImage = {
+  view: PreviewView;
+  blob: Blob;
+};
 
 const fileNames: Record<PreviewView, string> = {
   spread: 'mm-profile-spread.png',
@@ -278,8 +285,13 @@ export default function Home() {
   const [previewView, setPreviewView] = useState<PreviewView>('spread');
   const [selectedField, setSelectedField] = useState<TextFieldKey>('name');
   const [status, setStatus] = useState('');
+  const [shareStatus, setShareStatus] = useState('');
   const [siteShareStatus, setSiteShareStatus] = useState('');
   const [useXWebFallback, setUseXWebFallback] = useState(false);
+  const [shareStage, setShareStage] = useState<ShareStage>('idle');
+  const [preparedShareImage, setPreparedShareImage] =
+    useState<PreparedShareImage | null>(null);
+  const [sharePreparationAttempt, setSharePreparationAttempt] = useState(0);
   const canvasRef = useRef<ProfileCanvasHandle>(null);
   const modeScrollPositions = useRef<Record<MobileMode, number>>({
     input: 0,
@@ -334,6 +346,51 @@ export default function Home() {
       // Local saving is optional; the maker still works without it.
     }
   }, [hydrated, profile]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (mobileMode !== 'preview') return;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (cancelled) return;
+      setPreparedShareImage(null);
+      setShareStage('preparing');
+      setShareStatus('共有用画像を準備しています…');
+
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        if (!cancelled) {
+          setShareStage('error');
+          setShareStatus(
+            '共有用画像を準備できませんでした。再準備してください。',
+          );
+        }
+        return;
+      }
+
+      void canvas.makeBlob(previewView).then(
+        (blob) => {
+          if (cancelled) return;
+          setPreparedShareImage({ view: previewView, blob });
+          setShareStage('ready');
+          setShareStatus('共有用画像の準備ができました。');
+        },
+        () => {
+          if (cancelled) return;
+          setShareStage('error');
+          setShareStatus(
+            '共有用画像を準備できませんでした。再準備してください。',
+          );
+        },
+      );
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [mobileMode, previewView, profile, sharePreparationAttempt]);
 
   useEffect(() => {
     const context = document.modelContext;
@@ -448,7 +505,22 @@ export default function Home() {
   const changeMobileMode = (nextMode: MobileMode) => {
     if (nextMode === mobileMode) return;
     modeScrollPositions.current[mobileMode] = window.scrollY;
+    if (nextMode === 'preview') {
+      setPreparedShareImage(null);
+      setShareStage('preparing');
+      setShareStatus('共有用画像を準備しています…');
+    } else {
+      setShareStage('idle');
+    }
     setMobileMode(nextMode);
+  };
+
+  const changePreviewView = (nextView: PreviewView) => {
+    if (nextView === previewView) return;
+    setPreparedShareImage(null);
+    setShareStage('preparing');
+    setShareStatus('共有用画像を準備しています…');
+    setPreviewView(nextView);
   };
 
   const updateActivityType = (
@@ -545,63 +617,72 @@ export default function Home() {
     return `${shareUrl.toString()}\n#MMプロフィール #さんくすちぇるしー`;
   };
 
-  const shareViaXWeb = async (shareText: string) => {
+  const shareViaXWeb = (shareText: string, blob: Blob) => {
     const xWindow = window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`,
       '_blank',
     );
     if (xWindow) xWindow.opener = null;
 
-    try {
-      const blob = await canvasRef.current?.makeBlob(previewView);
-      if (!blob) return;
-      saveBlob(blob, fileNames[previewView]);
-      setStatus(
-        xWindow
-          ? '画像を保存し、Xの投稿画面を開きました。画像を添付してください。'
-          : '画像を保存しました。Xを開けない場合は、ブラウザのポップアップ設定をご確認ください。',
-      );
-    } catch {
-      setStatus('画像を保存できませんでした。もう一度お試しください。');
-    }
+    saveBlob(blob, fileNames[previewView]);
+    setShareStatus(
+      xWindow
+        ? '画像を保存し、Xの投稿画面を開きました。画像を添付してください。'
+        : '画像を保存しました。Xを開けない場合は、ブラウザのポップアップ設定をご確認ください。',
+    );
   };
 
   const shareToX = async () => {
+    if (
+      !preparedShareImage ||
+      preparedShareImage.view !== previewView ||
+      shareStage === 'error'
+    ) {
+      setPreparedShareImage(null);
+      setShareStage('preparing');
+      setSharePreparationAttempt((attempt) => attempt + 1);
+      setShareStatus('共有用画像を再準備しています…');
+      return;
+    }
+
     const shareText = makeShareText();
-    const probeFile = new File([''], fileNames[previewView], {
+    const file = new File([preparedShareImage.blob], fileNames[previewView], {
       type: 'image/png',
     });
+    const shareData = { files: [file], text: shareText };
     const shareNavigator = navigator as unknown as {
       share?: (data: ShareData) => Promise<void>;
       canShare?: (data: ShareData) => boolean;
     };
+    const nativeShare = useXWebFallback ? undefined : shareNavigator.share;
     const canShareFiles = Boolean(
-      !useXWebFallback &&
-      shareNavigator.share &&
-      shareNavigator.canShare?.({ files: [probeFile] }),
+      nativeShare && shareNavigator.canShare?.(shareData),
     );
 
-    if (!canShareFiles) {
-      await shareViaXWeb(shareText);
+    setShareStage('sharing');
+
+    if (!canShareFiles || !nativeShare) {
+      setShareStatus('画像を保存して、Xの投稿画面を開いています…');
+      shareViaXWeb(shareText, preparedShareImage.blob);
+      setShareStage('ready');
       return;
     }
 
     try {
-      const blob = await canvasRef.current?.makeBlob(previewView);
-      if (!blob) return;
-      const file = new File([blob], fileNames[previewView], {
-        type: 'image/png',
-      });
-      const shareData = { files: [file], text: shareText };
-
-      await shareNavigator.share?.(shareData);
-      setStatus('共有画面を開きました。');
+      setShareStatus('端末の共有画面を開いています…');
+      await nativeShare(shareData);
+      setShareStatus('共有が完了しました。');
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setShareStatus('共有をキャンセルしました。');
+        return;
+      }
       setUseXWebFallback(true);
-      setStatus(
-        'この端末向けの共有方法に切り替えました。もう一度ボタンを押してください。',
+      setShareStatus(
+        'この端末向けの共有方法に切り替えました。もう一度押すと、画像を保存してXを開きます。',
       );
+    } finally {
+      setShareStage('ready');
     }
   };
 
@@ -1056,7 +1137,7 @@ export default function Home() {
             </div>
             <Tabs
               value={previewView}
-              onValueChange={(value) => setPreviewView(value as PreviewView)}
+              onValueChange={(value) => changePreviewView(value as PreviewView)}
             >
               <TabsList
                 className="page-tabs preview-tabs"
@@ -1066,17 +1147,11 @@ export default function Home() {
                 <TabsTrigger value="right">右</TabsTrigger>
                 <TabsTrigger value="spread">見開き</TabsTrigger>
               </TabsList>
-              <TabsContent value="left">
-                <ProfileCanvas ref={canvasRef} profile={profile} view="left" />
-              </TabsContent>
-              <TabsContent value="right">
-                <ProfileCanvas ref={canvasRef} profile={profile} view="right" />
-              </TabsContent>
-              <TabsContent value="spread">
+              <TabsContent value={previewView}>
                 <ProfileCanvas
                   ref={canvasRef}
                   profile={profile}
-                  view="spread"
+                  view={previewView}
                 />
               </TabsContent>
             </Tabs>
@@ -1109,12 +1184,52 @@ export default function Home() {
                   見開き
                 </Button>
               </div>
-              <Button className="share-button" size="lg" onClick={shareToX}>
-                <Share2 aria-hidden="true" />
-                {useXWebFallback
-                  ? '画像を保存してXを開く'
-                  : '表示中の画像をXで共有'}
+              <Button
+                className="share-button"
+                size="lg"
+                aria-describedby="share-status"
+                disabled={
+                  shareStage === 'preparing' ||
+                  shareStage === 'sharing' ||
+                  (shareStage !== 'error' && !preparedShareImage)
+                }
+                onClick={shareToX}
+              >
+                {shareStage === 'preparing' ||
+                (shareStage === 'idle' && !preparedShareImage) ? (
+                  <>
+                    <LoaderCircle
+                      className="share-spinner"
+                      aria-hidden="true"
+                    />
+                    共有用画像を準備中…
+                  </>
+                ) : shareStage === 'sharing' ? (
+                  <>
+                    <LoaderCircle
+                      className="share-spinner"
+                      aria-hidden="true"
+                    />
+                    共有画面を開いています…
+                  </>
+                ) : (
+                  <>
+                    <Share2 aria-hidden="true" />
+                    {shareStage === 'error'
+                      ? '共有用画像を再準備'
+                      : useXWebFallback
+                        ? '画像を保存してXを開く'
+                        : '表示中の画像をXで共有'}
+                  </>
+                )}
               </Button>
+              <output
+                id="share-status"
+                className="status-message"
+                aria-live="polite"
+              >
+                {shareStatus}
+              </output>
             </div>
 
             <AlertDialog>

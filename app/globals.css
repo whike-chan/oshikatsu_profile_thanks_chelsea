@@ -688,6 +688,15 @@
   background: #76205f;
 }
 
+.share-button:disabled {
+  background: #805d77;
+  color: #fff;
+}
+
+.share-spinner {
+  animation: canvas-spin 0.8s linear infinite;
+}
+
 .status-message {
   margin: 0;
   color: #6d5065;
@@ -703,7 +712,7 @@
 
 .status-message {
   min-height: 1.3rem;
-  margin-top: 0.35rem;
+  margin-top: 0;
   text-align: center;
   font-weight: 700;
 }

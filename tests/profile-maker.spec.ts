@@ -265,3 +265,73 @@ test('PCでは画像を保存してXの投稿画面を開く', async ({ page }) 
   expect(shareText).toContain('#MMプロフィール');
   expect(shareText).toContain('#さんくすちぇるしー');
 });
+
+test('左・右・見開きを共有でき、キャンセル後も再試行できる', async ({
+  page,
+}) => {
+  await page.getByRole('tab', { name: 'できあがり確認' }).click();
+  await page.evaluate(() => {
+    type ShareCall = { fileName: string; userActivation: boolean };
+    const state = window as Window & { shareCalls?: ShareCall[] };
+    state.shareCalls = [];
+
+    Object.defineProperty(window.navigator, 'canShare', {
+      configurable: true,
+      value: () => true,
+    });
+    Object.defineProperty(window.navigator, 'share', {
+      configurable: true,
+      value: async (data: ShareData) => {
+        const call = {
+          fileName: data.files?.[0]?.name ?? '',
+          userActivation: window.navigator.userActivation?.isActive ?? false,
+        };
+        state.shareCalls?.push(call);
+        if (state.shareCalls?.length === 1) {
+          throw new DOMException('共有をキャンセル', 'AbortError');
+        }
+      },
+    });
+  });
+
+  const shareButton = page.getByRole('button', {
+    name: '表示中の画像をXで共有',
+  });
+
+  await page.getByRole('tab', { name: '左', exact: true }).click();
+  await expect(page.getByText('共有用画像の準備ができました。')).toBeVisible();
+  await expect(shareButton).toBeEnabled();
+  await shareButton.click();
+  await expect(page.getByText('共有をキャンセルしました。')).toBeVisible();
+
+  await shareButton.click();
+  await expect(page.getByText('共有が完了しました。')).toBeVisible();
+
+  await page.getByRole('tab', { name: '右', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: '共有用画像を準備中…' }),
+  ).toBeDisabled();
+  await expect(page.getByText('共有用画像の準備ができました。')).toBeVisible();
+  await shareButton.click();
+  await expect(page.getByText('共有が完了しました。')).toBeVisible();
+
+  await page.getByRole('tab', { name: '見開き' }).click();
+  await expect(page.getByText('共有用画像の準備ができました。')).toBeVisible();
+  await shareButton.click();
+  await expect(page.getByText('共有が完了しました。')).toBeVisible();
+
+  const calls = await page.evaluate(
+    () =>
+      (
+        window as Window & {
+          shareCalls?: Array<{ fileName: string; userActivation: boolean }>;
+        }
+      ).shareCalls,
+  );
+  expect(calls).toEqual([
+    { fileName: 'mm-profile-left.png', userActivation: true },
+    { fileName: 'mm-profile-left.png', userActivation: true },
+    { fileName: 'mm-profile-right.png', userActivation: true },
+    { fileName: 'mm-profile-spread.png', userActivation: true },
+  ]);
+});
